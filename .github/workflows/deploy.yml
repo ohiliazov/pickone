@@ -7,7 +7,10 @@ on:
 
 jobs:
   deploy:
-    runs-on: [self-hosted, pi-prod]
+    # NOT `pi-prod`. That label is already used by another project's runner on
+    # the same Pi; sharing it lets either repo's workflow land on the other's
+    # runner and deploy the wrong project from the wrong DEPLOY_DIR.
+    runs-on: [self-hosted, pickone-prod]
     steps:
       - name: Pull, migrate, restart
         run: |
@@ -21,7 +24,11 @@ jobs:
           # dependency is declared in compose, not sequenced here.
           docker compose -f docker-compose.prod.yml up -d --remove-orphans
           docker compose -f docker-compose.prod.yml rm -f migrate
-          docker image prune -f
+          # Scoped on purpose. A bare `docker image prune -f` is host-wide and
+          # would delete another project's untagged images — the ones it needs
+          # to roll back to.
+          docker images 'ohiliazov/pickone-*' --filter dangling=true -q \
+            | xargs -r docker rmi || true
 
       - name: Verify the deploy is actually serving
         run: |

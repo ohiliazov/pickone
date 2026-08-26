@@ -86,6 +86,33 @@ route in is the tunnel.
                               └───────────┘
 ```
 
+### Sharing the Pi with other projects
+
+The Pi already runs other stacks, so **every host-level artefact PickOne creates
+is namespaced**, and `setup-pi.sh` aborts rather than overwrite anything it does
+not recognise as its own:
+
+| | PickOne uses | Would have collided with |
+|---|---|---|
+| Tunnel config | `/etc/cloudflared/pickone.yml` | `config.yml` — shared, owned by the first project |
+| Tunnel service | `cloudflared-pickone.service` | `cloudflared.service`, via `cloudflared service install` |
+| Runner directory | `~/actions-runner-pickone/` | `~/actions-runner/` — and its `DEPLOY_DIR` |
+| Runner label | `pickone-prod` | `pi-prod` — a shared label deploys the wrong repo |
+| Host ports | `8100` / `3100` / `8180` | `8000` / `3000` / `8080` |
+| Image cleanup | only `ohiliazov/pickone-*` | host-wide `docker image prune -f` |
+| Compose project | `pickone` (name, network, volumes) | — |
+
+Two commands, both safe to run at any time:
+
+```bash
+bash scripts/pi/test-preflight.sh      # tests the guards; no Pi, Docker or root needed
+bash scripts/pi/coexistence-check.sh   # read-only report of what PickOne owns on this Pi
+```
+
+Guards fail **closed**: if the setup cannot verify who owns something — an
+unreadable runner registration, a config file without our marker — it stops
+instead of assuming it is safe.
+
 **One-time Pi setup** — idempotent, safe to re-run:
 
 ```bash

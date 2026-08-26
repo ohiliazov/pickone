@@ -1,4 +1,4 @@
-echo "=== [1/4] Installing Docker ==="
+echo "=== [1/4] Installing Docker (shared, idempotent) ==="
 if ! command -v docker &>/dev/null; then
   curl -fsSL https://get.docker.com | sh
   sudo usermod -aG docker "$USER"

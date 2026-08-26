@@ -1,4 +1,4 @@
-echo "=== [2/4] Installing cloudflared ==="
+echo "=== [2/4] Installing cloudflared (shared binary, idempotent) ==="
 if ! command -v cloudflared &>/dev/null; then
   curl -L --output cloudflared.deb \
     https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb
