@@ -1,0 +1,60 @@
+name: Deploy to Pi
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, pi-prod]
+    steps:
+      - name: Pull, migrate, restart
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          git pull --ff-only
+          export PICKONE_VERSION="$(cat VERSION)"
+          echo "Deploying PICKONE_VERSION=$PICKONE_VERSION"
+          docker compose -f docker-compose.prod.yml pull
+          # `migrate` runs to completion before api and worker start; the
+          # dependency is declared in compose, not sequenced here.
+          docker compose -f docker-compose.prod.yml up -d --remove-orphans
+          docker compose -f docker-compose.prod.yml rm -f migrate
+          docker image prune -f
+
+      - name: Verify the deploy is actually serving
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          for i in $(seq 1 30); do
+            if curl -fsS localhost:8100/readyz | grep -q '"status":"ready"'; then
+              echo "api ready after ${i}s"
+              break
+            fi
+            [ "$i" = "30" ] && { echo "api never became ready"; exit 1; }
+            sleep 1
+          done
+          curl -fsS -o /dev/null -w 'web %{http_code}\n' localhost:3100/
+          # The worker is the one service with no HTTP surface, and the one that
+          # fails silently. Confirm it actually took the singleton lock.
+          docker compose -f docker-compose.prod.yml logs --no-color --tail 50 worker \
+            | grep -q worker_lock_acquired \
+            || { echo "worker did not acquire the singleton lock"; exit 1; }
+          echo "worker holds the lock"
+
+      # `set -e` aborts before the `rm -f`, so a failed one-off container is
+      # still around with its logs — otherwise the only signal reaching CI is
+      # "exit 1", with the cause left behind on the Pi.
+      - name: Capture logs on failure
+        if: failure()
+        run: |
+          cd "$DEPLOY_DIR"
+          echo "::group::container states"
+          docker compose -f docker-compose.prod.yml ps -a || true
+          echo "::endgroup::"
+          for svc in migrate api worker web db; do
+            echo "::group::$svc logs"
+            docker compose -f docker-compose.prod.yml logs --no-color --tail 200 "$svc" || true
+            echo "::endgroup::"
+          done

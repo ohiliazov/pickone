@@ -1,0 +1,159 @@
+# Production stack for the Raspberry Pi.
+#
+# Images are pulled prebuilt and multi-arch from Docker Hub — never built here.
+# A Next.js build on a Pi takes long enough to be a bad idea, and `make push`
+# already produces linux/arm64.
+#
+# Nothing is published to the network: every port binds to 127.0.0.1 and the
+# only route in is the Cloudflare Tunnel (see cloudflared/config.yml).
+
+name: pickone
+
+services:
+  api:
+    image: ohiliazov/pickone-api:${PICKONE_VERSION:-latest}
+    env_file: .env.prod
+    ports:
+      - "127.0.0.1:8100:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz', timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks: [pickone_net]
+
+  # Same image as the API, different command. [SPEC §17.4]
+  #
+  # Exactly one instance, ever. The advisory lock in worker/singleton.py is the
+  # real enforcement — a second instance exits rather than double-sending email
+  # — and the lock is now waited on with backoff, because during a deploy the
+  # departing container's connection can outlive the container by a few seconds.
+  worker:
+    image: ohiliazov/pickone-api:${PICKONE_VERSION:-latest}
+    command: ["pickone-worker"]
+    env_file: .env.prod
+    deploy:
+      replicas: 1
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    logging: *logging
+    networks: [pickone_net]
+
+  # One-off. Runs to completion before api and worker start.
+  migrate:
+    image: ohiliazov/pickone-api:${PICKONE_VERSION:-latest}
+    command: ["alembic", "upgrade", "head"]
+    env_file: .env.prod
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: *logging
+    networks: [pickone_net]
+
+  web:
+    image: ohiliazov/pickone-web:${PICKONE_VERSION:-latest}
+    env_file: .env.prod
+    ports:
+      - "127.0.0.1:3100:3000"
+    depends_on:
+      - api
+    restart: unless-stopped
+    logging: *logging
+    networks: [pickone_net]
+
+  db:
+    image: postgres:16-alpine
+    env_file: .env.prod
+    # Tuned for a Pi, not a server. The defaults assume far more RAM than a
+    # 4–8GB board has, and PickOne's hot path is a short locking transaction
+    # rather than a large analytical scan.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=768MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - max_connections=40
+      - -c
+      - random_page_cost=1.1        # SSD/SD card, not a spinning disk
+      - -c
+      - synchronous_commit=on       # a pick is a durable fact; do not trade this away
+      - -c
+      - log_min_duration_statement=500
+      - -c
+      - log_lock_waits=on           # [SPEC §9.4] lock contention is the failure mode to watch
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    logging: *logging
+    networks: [pickone_net]
+
+  # Dozzle must never see the real socket: a socket mount is root-equivalent on
+  # the host, and `:ro` does NOT prevent that — it marks the file read-only
+  # while leaving the write API reachable. POST=0 is what actually blocks it.
+  dockerproxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    environment:
+      - CONTAINERS=1
+      - INFO=1
+      - EVENTS=1
+      - PING=1
+      - VERSION=1
+      - POST=0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # Deliberately unpublished — reachable only from pickone_net, the same trust
+    # boundary as the database.
+    restart: unless-stopped
+    logging: *logging
+    networks: [pickone_net]
+
+  # SECURITY: unauthenticated by design — access control is a Cloudflare Access
+  # policy on /logs. Drop that policy and container logs become public.
+  dozzle:
+    image: amir20/dozzle:v8.12.12
+    environment:
+      - DOCKER_HOST=tcp://dockerproxy:2375
+      - DOZZLE_BASE=/logs
+      - DOZZLE_NO_ANALYTICS=true
+    ports:
+      - "127.0.0.1:8180:8080"
+    depends_on:
+      - dockerproxy
+    restart: unless-stopped
+    logging: *logging
+    networks: [pickone_net]
+
+networks:
+  pickone_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

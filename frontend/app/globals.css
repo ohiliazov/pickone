@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. [SPEC §5.1, §5.3, §5.7]
+ *
+ * The complete light palette is defined on bare :root; the dark block
+ * redefines only what changes. Nothing gets its only definition inside a
+ * media query, so a value can never go missing in one theme.
+ */
+
+:root {
+  /* --- surface --- */
+  --po-bg: #fdfcfa;
+  --po-surface: #ffffff;
+  --po-border: #e4e0d8;
+  --po-border-strong: #c9c3b8;
+
+  /* --- ink --- */
+  --po-ink: #1a1917;
+  --po-ink-muted: #6b6660;
+  --po-ink-faint: #9a948c;
+
+  /* --- accent: used for the winner, focus rings, the + Add one pill --- */
+  --po-accent: #c2410c;
+  --po-accent-ink: #ffffff;
+  --po-focus: #0369a1;
+
+  /* --- motion [SPEC §5.3] --- */
+  --po-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --po-ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --po-dur-press: 80ms;
+  --po-dur-recede: 120ms;
+  --po-dur-swap: 180ms;
+  --po-dur-reveal: 900ms;
+
+  /* --- type scale: the card is the product, so it is the largest thing --- */
+  --po-card-text: clamp(1.75rem, 5.5vw, 3.5rem);
+  --po-card-min-h: clamp(140px, 26vh, 260px);
+  --po-measure: 720px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --po-bg: #14130f;
+    --po-surface: #1c1a16;
+    --po-border: #322e28;
+    --po-border-strong: #4a453c;
+    --po-ink: #f5f2ec;
+    --po-ink-muted: #a39d93;
+    --po-ink-faint: #6f6a62;
+    --po-accent: #fb923c;
+    --po-accent-ink: #14130f;
+    --po-focus: #7dd3fc;
+  }
+}
+
+:root[data-theme="dark"] {
+  --po-bg: #14130f;
+  --po-surface: #1c1a16;
+  --po-border: #322e28;
+  --po-border-strong: #4a453c;
+  --po-ink: #f5f2ec;
+  --po-ink-muted: #a39d93;
+  --po-ink-faint: #6f6a62;
+  --po-accent: #fb923c;
+  --po-accent-ink: #14130f;
+  --po-focus: #7dd3fc;
+}
+
+@theme inline {
+  --color-bg: var(--po-bg);
+  --color-surface: var(--po-surface);
+  --color-border-subtle: var(--po-border);
+  --color-border-strong: var(--po-border-strong);
+  --color-ink: var(--po-ink);
+  --color-ink-muted: var(--po-ink-muted);
+  --color-ink-faint: var(--po-ink-faint);
+  --color-accent: var(--po-accent);
+  --color-accent-ink: var(--po-accent-ink);
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--po-bg);
+  color: var(--po-ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* [SPEC §5.7] A visible focus ring on everything. Never outline: none. */
+:focus-visible {
+  outline: 3px solid var(--po-focus);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* [SPEC §5.3] Reduced motion drops transforms to opacity-only.
+   Nothing becomes unreachable; the loop still works. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 100ms !important;
+    scroll-behavior: auto !important;
+  }
+}

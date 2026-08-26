@@ -1,0 +1,5 @@
+_PI_SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEPLOY_DIR="${DEPLOY_DIR:-$(cd "$_PI_SCRIPTS_DIR/../.." && pwd)}"
+REPO_URL="${REPO_URL:-git@github.com:ohiliazov/pickone.git}"
+REPO_SLUG="${REPO_SLUG:-ohiliazov/pickone}"
+CF_TUNNEL_NAME="${CF_TUNNEL_NAME:-pickone}"

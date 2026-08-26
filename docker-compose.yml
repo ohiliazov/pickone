@@ -1,0 +1,74 @@
+# Local development. Everything is built from source with hot reload.
+# Production lives in docker-compose.prod.yml and pulls prebuilt images.
+name: pickone
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pickone
+      POSTGRES_PASSWORD: pickone
+      POSTGRES_DB: pickone
+    ports:
+      # Host ports are overridable — see .env.example. Container ports never change.
+      - "${PICKONE_DB_PORT:-5100}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pickone -d pickone"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ./backend
+      target: development
+    environment:
+      PICKONE_ENV: local
+      PICKONE_DATABASE_URL: postgresql+asyncpg://pickone:pickone@db:5432/pickone
+      PICKONE_BASE_URL: http://localhost:3100
+    ports:
+      - "${PICKONE_API_PORT:-8100}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn pickone.api.app:app --host 0.0.0.0 --port 8000 --reload"
+    volumes:
+      - ./backend/src:/app/src
+
+  worker:
+    build:
+      context: ./backend
+      target: development
+    environment:
+      PICKONE_ENV: local
+      PICKONE_DATABASE_URL: postgresql+asyncpg://pickone:pickone@db:5432/pickone
+    depends_on:
+      api:
+        condition: service_started
+    command: pickone-worker
+    volumes:
+      - ./backend/src:/app/src
+
+  web:
+    build:
+      context: ./frontend
+      target: development
+    environment:
+      NEXT_PUBLIC_ENV: local
+      NEXT_PUBLIC_BASE_URL: http://localhost:3100
+      NEXT_PUBLIC_API_URL: http://localhost:8100
+    ports:
+      - "${PICKONE_WEB_PORT:-3100}:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
