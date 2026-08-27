@@ -1,9 +1,3 @@
-"""Alembic environment, async, wired to the ORM metadata.
-
-``target_metadata`` is the live ``Base.metadata`` so that ``alembic check``
-(the autogenerate-diff-is-empty test) is meaningful.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -14,6 +8,7 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+import pickone.db.all_models  # noqa: F401
 from pickone.core.config import get_settings
 from pickone.db.base import Base
 

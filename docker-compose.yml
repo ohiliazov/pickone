@@ -61,6 +61,7 @@ services:
       NEXT_PUBLIC_ENV: local
       NEXT_PUBLIC_BASE_URL: http://localhost:3100
       NEXT_PUBLIC_API_URL: http://localhost:8100
+      API_INTERNAL_URL: http://api:8000
     ports:
       - "${PICKONE_WEB_PORT:-3100}:3000"
     volumes:

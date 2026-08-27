@@ -1,14 +1,3 @@
-"""The error envelope.  [SPEC §8.1]
-
-One shape, always::
-
-    {"error": {"code": "battle_expired", "message": "That one timed out.", "details": {}}}
-
-``message`` is user-safe copy in the product lexicon ([SPEC §5.6]) — the client
-may display it verbatim, so it must never contain a stack trace, a field name,
-a provider score, or the word "error".
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -23,8 +12,6 @@ logger = get_logger(__name__)
 
 
 class PickOneError(Exception):
-    """Base for every error the API deliberately returns."""
-
     code: str = "internal_error"
     message: str = "Something went wrong."
     status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -34,9 +21,11 @@ class PickOneError(Exception):
         message: str | None = None,
         *,
         details: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         self.message = message or self.__class__.message
         self.details = details or {}
+        self.headers = headers or {}
         super().__init__(self.message)
 
     def envelope(self) -> dict[str, Any]:
@@ -50,8 +39,6 @@ class NotFoundError(PickOneError):
 
 
 class NotAuthenticatedError(PickOneError):
-    """401. Used for the guest-hits-a-members-only-route case.  [SPEC §8.3]"""
-
     code = "account_required"
     message = "Make an account first."
     status_code = status.HTTP_401_UNAUTHORIZED
@@ -60,6 +47,12 @@ class NotAuthenticatedError(PickOneError):
 class ForbiddenError(PickOneError):
     code = "forbidden"
     message = "Not allowed."
+    status_code = status.HTTP_403_FORBIDDEN
+
+
+class CSRFFailedError(PickOneError):
+    code = "csrf_failed"
+    message = "Request blocked."
     status_code = status.HTTP_403_FORBIDDEN
 
 
@@ -78,7 +71,7 @@ class GoneError(PickOneError):
 class InvalidInputError(PickOneError):
     code = "invalid_input"
     message = "We can't use that."
-    status_code = 422  # the named constant is mid-rename in starlette; the number is not
+    status_code = 422
 
 
 class RateLimitedError(PickOneError):
@@ -96,12 +89,12 @@ class ServiceUnavailableError(PickOneError):
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(PickOneError)
     async def _pickone_error(_: Request, exc: PickOneError) -> JSONResponse:
-        return JSONResponse(status_code=exc.status_code, content=exc.envelope())
+        return JSONResponse(
+            status_code=exc.status_code, content=exc.envelope(), headers=exc.headers
+        )
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
-        # FastAPI's default 422 body leaks internal field paths and does not match
-        # the documented envelope. Normalise it.
         fields = sorted({str(e["loc"][-1]) for e in exc.errors() if e.get("loc")})
         err = InvalidInputError(details={"fields": fields})
         return JSONResponse(status_code=err.status_code, content=err.envelope())

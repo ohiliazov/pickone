@@ -1,13 +1,11 @@
 import type { NextConfig } from "next";
 
+const apiUrl = process.env.API_INTERNAL_URL ?? "http://localhost:8100";
+
 const nextConfig: NextConfig = {
-  // Standalone output keeps the Pi image small and removes the need for
-  // node_modules at runtime.
   output: "standalone",
   reactStrictMode: true,
   poweredByHeader: false,
-  // SPEC §13.2 — the full header set lands in M7. These two are free now and
-  // there is no reason to ship a preview without them.
   async headers() {
     return [
       {
@@ -18,6 +16,9 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
+  },
+  async rewrites() {
+    return [{ source: "/api/:path*", destination: `${apiUrl}/api/:path*` }];
   },
 };
 
