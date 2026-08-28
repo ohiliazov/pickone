@@ -36,6 +36,7 @@ class UserOut(BaseModel):
     email: str | None
     email_verified: bool
     is_guest: bool
+    is_admin: bool
 
     @classmethod
     def from_user(cls, user: User) -> UserOut:
@@ -44,6 +45,7 @@ class UserOut(BaseModel):
             email=user.email,
             email_verified=user.email_verified_at is not None,
             is_guest=user.is_guest,
+            is_admin=user.is_admin,
         )
 
 

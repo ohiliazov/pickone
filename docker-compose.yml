@@ -46,6 +46,9 @@ services:
     environment:
       PICKONE_ENV: local
       PICKONE_DATABASE_URL: postgresql+asyncpg://pickone:pickone@db:5432/pickone
+      PICKONE_EMAIL_PROVIDER: ${PICKONE_EMAIL_PROVIDER:-console}
+      PICKONE_RESEND_API_KEY: ${PICKONE_RESEND_API_KEY:-}
+      PICKONE_MAIL_FROM: ${PICKONE_MAIL_FROM:-noreply@pickone.app}
     depends_on:
       api:
         condition: service_started

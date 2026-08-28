@@ -63,6 +63,16 @@ export function Nav() {
                     />
                     Slower pace
                   </label>
+                  {user.is_admin && (
+                    <Link
+                      href="/admin/moderation"
+                      role="menuitem"
+                      onClick={() => setMenuOpen(false)}
+                      className="block rounded px-2 py-1.5 hover:bg-[var(--po-bg)]"
+                    >
+                      Admin
+                    </Link>
+                  )}
                   <button
                     type="button"
                     role="menuitem"

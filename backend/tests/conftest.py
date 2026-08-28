@@ -83,6 +83,15 @@ async def db_session(db_connection: AsyncConnection) -> AsyncIterator[AsyncSessi
 
 
 @pytest.fixture(autouse=True)
+def _reset_circuit_breaker() -> Iterator[None]:
+    from pickone.moderation.circuit_breaker import reset_circuit_breaker
+
+    reset_circuit_breaker()
+    yield
+    reset_circuit_breaker()
+
+
+@pytest.fixture(autouse=True)
 async def _reset_app_engine_cache() -> AsyncIterator[None]:
     from pickone.db.engine import get_engine, get_sessionmaker
 

@@ -3,6 +3,46 @@ export type UserOut = {
   email: string | null;
   email_verified: boolean;
   is_guest: boolean;
+  is_admin: boolean;
+};
+
+export type ItemSummary = {
+  id: string;
+  text: string;
+  slug: string;
+  status: string;
+  rating: number;
+};
+
+export type ModerationQueueItem = {
+  id: string;
+  text: string;
+  slug: string;
+  status: string;
+  created_at: string;
+  created_by_user_id: string | null;
+  latest_scores: Record<string, number>;
+  latest_provider: string | null;
+};
+
+export type ModerationQueueResponse = {
+  items: ModerationQueueItem[];
+};
+
+export type ReportEntry = {
+  id: string;
+  reporter_user_id: string | null;
+  reason: string;
+  created_at: string;
+};
+
+export type ReportedItemGroup = {
+  item: ItemSummary;
+  reports: ReportEntry[];
+};
+
+export type ReportsResponse = {
+  reports: ReportedItemGroup[];
 };
 
 export type ApiErrorBody = {

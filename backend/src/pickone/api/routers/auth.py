@@ -26,10 +26,12 @@ from pickone.auth.schemas import (
     VerifyRequest,
     VerifyResponse,
 )
+from pickone.core import ratelimit
 from pickone.core.clock import get_clock
 from pickone.core.config import get_settings
 from pickone.core.security import derive_csrf_token
 from pickone.db.session import get_session
+from pickone.items.service import daily_rate_limit_key, effective_daily_item_limit
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
@@ -163,13 +165,16 @@ async def password_reset_confirm_route(
 async def me_route(
     actor: Annotated[User, Depends(required_actor)],
     session_row: Annotated[Session, Depends(required_session)],
+    session: SessionDep,
 ) -> MeResponse:
-    settings = get_settings()
     csrf_token = derive_csrf_token(session_row.csrf_secret, str(session_row.id))
+    now = get_clock().now()
+    daily_limit = effective_daily_item_limit(actor, now=now)
+    used = await ratelimit.peek(session, daily_rate_limit_key(actor), window_seconds=86400)
     return MeResponse(
         user=UserOut.from_user(actor),
         csrf_token=csrf_token,
-        limits=MeLimits(items_remaining_today=settings.rl_items_per_day_user),
+        limits=MeLimits(items_remaining_today=max(daily_limit - used, 0)),
     )
 
 

@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from pickone import __version__
 from pickone.api.csrf import CSRFMiddleware, SessionScope
 from pickone.api.middleware import RequestIdMiddleware
-from pickone.api.routers import auth, health
+from pickone.api.routers import admin, auth, health, items
 from pickone.core.config import Env, Settings, get_settings
 from pickone.core.errors import install_error_handlers
 from pickone.core.logging import configure_logging, get_logger
@@ -49,6 +49,8 @@ def create_app(
     install_error_handlers(app)
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(items.router)
+    app.include_router(admin.router)
     return app
 
 

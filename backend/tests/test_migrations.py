@@ -42,6 +42,9 @@ async def test_migrations_create_exactly_the_expected_tables(engine: AsyncEngine
         "email_tokens",
         "rate_limits",
         "outbox_jobs",
+        "items",
+        "moderation_results",
+        "item_reports",
     }
     assert tables == expected, f"unexpected: {tables - expected}, missing: {expected - tables}"
 

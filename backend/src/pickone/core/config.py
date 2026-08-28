@@ -87,12 +87,42 @@ class Settings(BaseSettings):
     guest_janitor_interval_minutes: float = Field(default=60.0, gt=0)
 
     rl_items_per_day_user: int = Field(default=20, ge=1)
+    rl_items_per_hour_user: int = Field(default=5, ge=1)
+    rl_items_per_day_ip: int = Field(default=50, ge=1)
+    rl_items_per_day_new_account: int = Field(default=5, ge=1)
+    new_account_age_hours: int = Field(default=24, ge=1)
+
+    item_max_length: int = Field(default=64, ge=2)
+    item_default_rating: float = 0.0
+    item_default_rating_deviation: float = Field(default=350.0, gt=0, le=350)
+
+    moderation_provider: str = "heuristic"
+    openai_api_key: str = ""
+    moderation_model: str = "omni-moderation-latest"
+    moderation_timeout_ms: int = Field(default=2500, ge=1)
+    moderation_policy_version: str = "v1"
+    moderation_circuit_breaker_threshold: int = Field(default=10, ge=1)
+    moderation_circuit_breaker_cooldown_seconds: float = Field(default=60.0, gt=0)
+
+    auto_hide_report_count: int = Field(default=5, ge=1)
 
     @model_validator(mode="after")
     def _resend_requires_a_key_in_production(self) -> Settings:
         if self.env.is_production and self.email_provider == "resend" and not self.resend_api_key:
             raise ValueError(
                 "PICKONE_RESEND_API_KEY is required when PICKONE_EMAIL_PROVIDER=resend"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _openai_requires_a_key_in_production(self) -> Settings:
+        if (
+            self.env.is_production
+            and self.moderation_provider == "openai"
+            and not self.openai_api_key
+        ):
+            raise ValueError(
+                "PICKONE_OPENAI_API_KEY is required when PICKONE_MODERATION_PROVIDER=openai"
             )
         return self
 
@@ -110,6 +140,10 @@ class Settings(BaseSettings):
             problems.append("PICKONE_DATABASE_URL points at localhost")
         if not self.base_url.startswith("https://"):
             problems.append("PICKONE_BASE_URL must be https in production")
+        if self.moderation_provider == "null":
+            problems.append(
+                "PICKONE_MODERATION_PROVIDER is NullProvider, which approves everything"
+            )
 
         if problems:
             raise ValueError("Refusing to start in production:\n  - " + "\n  - ".join(problems))

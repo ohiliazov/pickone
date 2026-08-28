@@ -912,7 +912,7 @@ GET  /api/admin/moderation/queue?status=REVIEW               (admin) → 200 { i
 POST /api/admin/items/{id}/decision { "decision": "APPROVED" | "REJECTED" }  (admin) → 200
 ```
 
-Admin is a minimal, protected, server-rendered surface. Not a product. See §12.6.
+Admin is a minimal, protected surface: a Next.js page under `/admin` consuming this same JSON API, consistent with §17.2 — FastAPI is backend-only, Next.js is the only frontend, no second rendering stack. Not a product. See §12.6.
 
 ### 8.6 Public non-JSON routes (frontend)
 
@@ -1505,7 +1505,7 @@ Named-person detection (targeting a private individual) has no provider category
 
 ### 12.6 Admin review
 
-The smallest thing that works. A server-rendered, admin-only surface (FastAPI + Jinja, or `sqladmin`) with three screens:
+The smallest thing that works. An admin-only surface, built the same way as every other authenticated page: Next.js under `/admin`, calling the JSON API in §8.5. FastAPI never renders HTML — §17.2 already settles that fork for the whole product, and admin is not an exception to it. Three screens:
 
 1. **Queue** — items in `REVIEW` or `PENDING_MODERATION`, oldest first, with text, provider scores, creator, creation time.
 2. **Decision** — Approve / Reject buttons. Writes a new `moderation_results` row with `reviewed_by_user_id`, updates `items.status`, sets `published_at` on approval.
@@ -2049,7 +2049,6 @@ pickone/
 ├── comparisons/    repository, canonicalisation, slugs
 ├── rankings/       queries, materialised view refresh
 ├── public/         read-only endpoints for SEO pages
-├── admin/          moderation queue
 ├── analytics/      event ingest, rollup views
 ├── worker/         scheduler, jobs/, outbox runner
 └── api/            routers, dependencies, middleware (auth, csrf, ratelimit, request-id)

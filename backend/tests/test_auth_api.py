@@ -6,6 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pickone.auth.models import User
 from pickone.core.config import get_settings
 from pickone.core.models import OutboxJob
 
@@ -16,6 +17,62 @@ async def _latest_token(session: AsyncSession, to: str, marker: str) -> str:
     job = next(j for j in jobs if j.payload.get("to") == to and marker in j.payload["body"])
     url = job.payload["body"].split("\n\n")[1].strip()
     return str(parse_qs(urlparse(url).query)["token"][0])
+
+
+async def test_me_exposes_is_admin(client: AsyncClient, db_session: AsyncSession) -> None:
+    reg_resp = await client.post(
+        "/api/auth/register",
+        json={"email": "isadmin@b.com", "password": "correcthorse1"},
+        headers={"Origin": get_settings().base_url},
+    )
+    assert reg_resp.json()["user"]["is_admin"] is False
+
+    result = await db_session.execute(select(User).where(User.email == "isadmin@b.com"))
+    user = result.scalar_one()
+    user.is_admin = True
+    await db_session.flush()
+
+    me_resp = await client.get("/api/me")
+    assert me_resp.json()["user"]["is_admin"] is True
+
+
+async def test_me_items_remaining_today_reflects_real_usage(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    from datetime import timedelta
+
+    from pickone.core.clock import get_clock
+
+    origin = get_settings().base_url
+    email = "itemsleft@b.com"
+    reg_resp = await client.post(
+        "/api/auth/register",
+        json={"email": email, "password": "correcthorse1"},
+        headers={"Origin": origin},
+    )
+    csrf_token = reg_resp.json()["csrf_token"]
+
+    result = await db_session.execute(select(User).where(User.email == email))
+    user = result.scalar_one()
+    user.created_at = get_clock().now() - timedelta(days=30)
+    user.email_verified_at = get_clock().now()
+    await db_session.flush()
+
+    settings = get_settings()
+    me_resp = await client.get("/api/me")
+    assert me_resp.json()["limits"]["items_remaining_today"] == settings.rl_items_per_day_user
+
+    await client.post(
+        "/api/items",
+        json={"text": "Something to add"},
+        headers={"Origin": origin, "X-PickOne-CSRF": csrf_token},
+    )
+
+    me_resp_after = await client.get("/api/me")
+    assert (
+        me_resp_after.json()["limits"]["items_remaining_today"]
+        == settings.rl_items_per_day_user - 1
+    )
 
 
 async def test_full_register_verify_login_logout_reset_login_delete_cycle(
