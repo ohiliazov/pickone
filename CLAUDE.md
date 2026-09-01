@@ -1,8 +1,7 @@
 # PickOne
 
-<directives>
-These rules are binding. Follow them exactly and silently — do not narrate them, and do not restate them back.
-</directives>
+Global rules (comments, TDD, verification, tone, git/plans workflow) live in `~/CLAUDE.md`. This file covers only
+what's specific to PickOne.
 
 ## 1. Stack
 <stack>
@@ -14,26 +13,18 @@ These rules are binding. Follow them exactly and silently — do not narrate the
 </stack>
 
 ## 2. Rules
-*   **Comments:** Zero comments. Zero docstrings. Purge existing multi-line or inline comments on sight when modifying files. Naming and structure carry all meaning.
-*   **Single source of truth:** Do not duplicate logic. If you detect duplicate logic or inconsistent patterns across sibling components/pages, deduplicating and making them consistent takes priority over the task in hand.
-*   **TDD:** Mandatory. Write minimal happy-path failing tests first, run them, implement minimal code, and verify. Non-happy path tests are required only when a bug manifests.
-*   **Challenge assumptions:** Proactively dispute user ideas, assumptions, and plans. You are here to challenge logic, but never to invent your own ideas or assumptions. Answer questions directly before assuming intent.
-*   **Verification:** Perform every verification step for real — write failing tests before implementing, run the actual commands, and read the output before claiming a result. API-only checks → `curl`. Layout/theme rendering → screenshot. Rebuild Docker containers only when a `Dockerfile` or lockfile changes.
-*   **Linting:** `make lint` is the whole check (`ruff check`, `ruff format`, `mypy` strict on `rating/` & `battles/`, `import-linter`, eslint, `tsc`). Run it until green. Do not invoke the tools piecemeal.
+*   **Verification:** API-only checks → `curl`. Layout/theme rendering → screenshot. Rebuild Docker containers only
+    when a `Dockerfile` or lockfile changes.
+*   **Linting:** `make lint` is the whole check (`ruff check`, `ruff format`, `mypy` strict on `rating/` & `battles/`,
+    `import-linter`, eslint, `tsc`).
 
 ## 3. Architecture
 *   **Backend:** Pydantic v2 does not coerce UUID to `str` automatically — build response schemas explicitly, never rely on `from_attributes` for a UUID field. Postgres-backed fixed-window / `FOR UPDATE SKIP LOCKED` primitives for rate limiting and outbox delivery (no Redis until >4 API processes or p95 check latency >5ms).
-*   **Frontend:** Mobile-first Tailwind (`md:`, `lg:`). Tailwind 4 CSS-first tokens in `app/globals.css` on bare `:root` with dark/light overrides layered on top, never only inside a media query. `react/no-danger` is an ESLint error with zero exceptions — item text is user content rendered strictly as text, never HTML.
-*   **Git & Plans:** Plans go in `docs/subpowers/plans/` (via `subpowers-plan`). Never force-push or commit directly to `main`. Update plan state blocks before yielding.
+*   **Frontend:** Tailwind 4 CSS-first tokens in `app/globals.css` on bare `:root` with dark/light overrides layered
+    on top, never only inside a media query. `react/no-danger` is an ESLint error with zero exceptions — item text is
+    user content rendered strictly as text, never HTML.
 
-## 4. Hard limits
-<constraints>
-*   **Never** commit or yield code without having run the verification commands and read their output.
-*   **Never** apologize or alter your technical pacing based on user tone or profanity. Tone is baseline communication style, not emotional signal.
-*   **Never** narrate rules, quote CLAUDE.md, or say "per CLAUDE.md". Follow the rules silently.
-</constraints>
-
-## 5. Gotchas
+## 4. Gotchas
 *   **SQLAlchemy 2.0+:** Async-only — no `session.query()`, no sync `Session`.
 *   **Pydantic v2:** `.model_dump()`, `.model_dump_json()`, `@field_validator`. No automatic UUID → `str` coercion.
 *   **Tailwind 4:** CSS-first config, no `tailwind.config.js`.
@@ -44,17 +35,3 @@ These rules are binding. Follow them exactly and silently — do not narrate the
 *   **FastAPI + `from __future__ import annotations`:** a route function only resolves `Depends(x)` from `Annotated[T, Depends(x)]` if `x` is reachable via the route function's *module* globals at type-hint-evaluation time. Importing `x` inside an enclosing test-fixture function (a local, not a module global) makes FastAPI silently fall back to treating the parameter as a required query field — a 422 with no obvious cause. Always import anything referenced inside `Depends(...)` at module level, even in test files.
 *   **pytest-asyncio:** `AsyncEngine` fixture must be function-scoped, not session-scoped (prevents connection binding to stale event loop across tests). `asyncio_default_fixture_loop_scope` must be `"function"` too — at `"session"`, a fixture that depends on another async fixture opening a real connection sets up on the session loop while the test body runs on a function loop, and the first query fails with "attached to a different loop" even though the fixture code is correct.
 
-## 6. Skills
-| Skill | Purpose |
-| :--- | :--- |
-| `subpowers-explore` | Read-only discovery and architectural tracing |
-| `subpowers-spec` | Define business logic and data models (the "what") |
-| `subpowers-plan` | Multi-file implementation plans (the "how") |
-| `subpowers-implement` | Execute TDD and localized changes |
-| `subpowers-debug` | Root-cause debugging (3-strike limit, scoped rollback) |
-| `subpowers-check` | Verification against real command output |
-
-The `subpowers-*` skills are a user-scope plugin ([ohiliazov/subpowers](https://github.com/ohiliazov/subpowers)),
-not project skills. They are stack-agnostic: every command they run, the plans directory, and the condensed copy of
-this file's laws live in [`.claude/subpowers.md`](.claude/subpowers.md). **Change a law here, update that contract in
-the same commit** — `subpowers-implement`'s self-review applies it verbatim.

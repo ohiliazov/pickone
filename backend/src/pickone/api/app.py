@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import sentry_sdk
 from fastapi import FastAPI
 
 from pickone import __version__
@@ -28,6 +29,8 @@ def create_app(
     settings: Settings | None = None, *, session_scope: SessionScope | None = None
 ) -> FastAPI:
     settings = settings or get_settings()
+    if settings.glitchtip_dsn:
+        sentry_sdk.init(dsn=settings.glitchtip_dsn, environment=settings.env.value)
     configure_logging(
         level=settings.log_level,
         json_output=settings.env is not Env.LOCAL,

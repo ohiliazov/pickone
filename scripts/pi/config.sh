@@ -36,7 +36,7 @@ RUNNER_LABEL="${PROJECT}-prod"
 
 # --- Host ports --------------------------------------------------------------
 # Must match docker-compose.prod.yml. Checked by 00-preflight.sh.
-HOST_PORTS=(8100 3100 8180)
+HOST_PORTS=(8100 3100)
 
 # Marker written into every file this setup generates, so a re-run can tell its
 # own output from a file that belongs to somebody else.

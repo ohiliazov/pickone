@@ -1,8 +1,7 @@
-"""The error envelope is one shape, always. [SPEC §8.1]"""
-
 from __future__ import annotations
 
 import pytest
+import sentry_sdk
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient, Response
 
@@ -36,8 +35,6 @@ def error_app() -> FastAPI:
 
 
 async def _get(app: FastAPI, path: str) -> Response:
-    # raise_app_exceptions=False because Starlette's ServerErrorMiddleware always
-    # re-raises after building the 500 response, so the server can log it.
     transport = ASGITransport(app=app, raise_app_exceptions=False)
     async with AsyncClient(transport=transport, base_url="http://t") as ac:
         return await ac.get(path)
@@ -70,7 +67,6 @@ async def test_unhandled_exception_leaks_nothing(error_app: FastAPI) -> None:
 
 
 def test_messages_are_user_safe() -> None:
-    """Copy is shown verbatim to users, so it lives in the product lexicon."""
     banned = {"error", "exception", "invalid request", "failed"}
     for cls in PickOneError.__subclasses__():
         msg = cls.message.lower()
@@ -79,5 +75,14 @@ def test_messages_are_user_safe() -> None:
 
 
 def test_not_found_is_the_wrong_owner_answer() -> None:
-    """[SPEC §8.4] Wrong-owner returns 404, not 403, so ids are not an oracle."""
     assert NotFoundError.status_code == 404
+
+
+async def test_unhandled_exception_is_reported_to_sentry(
+    error_app: FastAPI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[BaseException] = []
+    monkeypatch.setattr(sentry_sdk, "capture_exception", captured.append)
+    await _get(error_app, "/boom")
+    assert len(captured) == 1
+    assert isinstance(captured[0], RuntimeError)

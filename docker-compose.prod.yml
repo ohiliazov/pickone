@@ -114,42 +114,6 @@ services:
     logging: *logging
     networks: [pickone_net]
 
-  # Dozzle must never see the real socket: a socket mount is root-equivalent on
-  # the host, and `:ro` does NOT prevent that — it marks the file read-only
-  # while leaving the write API reachable. POST=0 is what actually blocks it.
-  dockerproxy:
-    image: tecnativa/docker-socket-proxy:0.3.0
-    environment:
-      - CONTAINERS=1
-      - INFO=1
-      - EVENTS=1
-      - PING=1
-      - VERSION=1
-      - POST=0
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    # Deliberately unpublished — reachable only from pickone_net, the same trust
-    # boundary as the database.
-    restart: unless-stopped
-    logging: *logging
-    networks: [pickone_net]
-
-  # SECURITY: unauthenticated by design — access control is a Cloudflare Access
-  # policy on /logs. Drop that policy and container logs become public.
-  dozzle:
-    image: amir20/dozzle:v8.12.12
-    environment:
-      - DOCKER_HOST=tcp://dockerproxy:2375
-      - DOZZLE_BASE=/logs
-      - DOZZLE_NO_ANALYTICS=true
-    ports:
-      - "127.0.0.1:8180:8080"
-    depends_on:
-      - dockerproxy
-    restart: unless-stopped
-    logging: *logging
-    networks: [pickone_net]
-
 networks:
   pickone_net:
     driver: bridge

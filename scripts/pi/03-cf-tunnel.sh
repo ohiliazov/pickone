@@ -84,5 +84,3 @@ if systemctl list-unit-files 2>/dev/null | grep -q '^cloudflared\.service'; then
 fi
 
 echo ""
-echo "  !! Before going live: add a Cloudflare Access policy on https://${DOMAIN}/logs"
-echo "     Dozzle has no authentication of its own, and container logs are not public data."

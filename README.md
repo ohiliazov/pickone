@@ -73,18 +73,21 @@ route in is the tunnel.
                     ┌─────▼──────┐
                     │ cloudflared│  systemd, /etc/cloudflared/config.yml
                     └─────┬──────┘
-        /api/* ───────────┼──────────── /logs ───────────── everything else
-              │           │                 │                      │
-      127.0.0.1:8100  (host)        127.0.0.1:8180        127.0.0.1:3100
-              │                             │                      │
-          ┌───▼───┐  ┌────────┐  ┌──────────▼─────────┐        ┌───▼───┐
-          │  api  │  │ worker │  │ dozzle→dockerproxy │        │  web  │
-          └───┬───┘  └───┬────┘  └────────────────────┘        └───────┘
+        /api/* ───────────┼──────────────────────── everything else
+              │           │                                │
+      127.0.0.1:8100  (host)                        127.0.0.1:3100
+              │                                             │
+          ┌───▼───┐  ┌────────┐                         ┌───▼───┐
+          │  api  │  │ worker │                          │  web  │
+          └───┬───┘  └───┬────┘                          └───────┘
               └──────────┴──────────┐
                               ┌─────▼─────┐
                               │ postgres  │  (unpublished)
                               └───────────┘
 ```
+
+Container logs, error tracking, and uptime monitoring are shared Pi-wide infra, not
+part of this stack — see [`ohiliazov-pi`](https://github.com/ohiliazov/ohiliazov-pi).
 
 ### Sharing the Pi with other projects
 
@@ -98,7 +101,7 @@ not recognise as its own:
 | Tunnel service | `cloudflared-pickone.service` | `cloudflared.service`, via `cloudflared service install` |
 | Runner directory | `~/actions-runner-pickone/` | `~/actions-runner/` — and its `DEPLOY_DIR` |
 | Runner label | `pickone-prod` | `pi-prod` — a shared label deploys the wrong repo |
-| Host ports | `8100` / `3100` / `8180` | `8000` / `3000` / `8080` |
+| Host ports | `8100` / `3100` | `8000` / `3000` |
 | Image cleanup | only `ohiliazov/pickone-*` | host-wide `docker image prune -f` |
 | Compose project | `pickone` (name, network, volumes) | — |
 
@@ -141,10 +144,8 @@ the worker actually took its singleton lock.
 
 The Pi never builds. It pulls prebuilt multi-arch images.
 
-Three things worth knowing before touching production:
+Two things worth knowing before touching production:
 
-- **`/logs` (Dozzle) has no authentication of its own.** It is protected by a
-  Cloudflare Access policy. Remove that policy and container logs become public.
 - **`NEXT_PUBLIC_*` is baked in at image build time**, not read from `.env.prod`.
   `NEXT_PUBLIC_ENV=production` is what makes `robots.txt` allow crawling — build
   without it and the site ships `noindex` ([SPEC §14.8](docs/SPEC.md#148-robotstxt)).

@@ -2072,20 +2072,23 @@ Enforced boundaries (by import-linter or an equivalent CI check, because these a
                     ┌─────▼──────┐
                     │ cloudflared│  systemd unit, /etc/cloudflared/config.yml
                     └─────┬──────┘
-       /api/* ────────────┼──────────── /logs ─────────────── everything else
-             │            │                  │                        │
-     127.0.0.1:8100       │          127.0.0.1:8180          127.0.0.1:3100
-             │            │                  │                        │
-        ┌────▼────┐  ┌────▼────┐  ┌──────────▼──────────┐        ┌────▼────┐
-        │ FastAPI │  │ worker  │  │ dozzle → dockerproxy│        │ Next.js │
-        │  N=1    │  │  N=1    │  │  (POST=0, no socket)│        │  N=1    │
-        └────┬────┘  └────┬────┘  └─────────────────────┘        └─────────┘
+       /api/* ────────────┼──────────────────────────── everything else
+             │            │                                     │
+     127.0.0.1:8100       │                             127.0.0.1:3100
+             │            │                                     │
+        ┌────▼────┐  ┌────▼────┐                           ┌────▼────┐
+        │ FastAPI │  │ worker  │                            │ Next.js │
+        │  N=1    │  │  N=1    │                            │  N=1    │
+        └────┬────┘  └────┬────┘                            └─────────┘
              └────────────┴───────────────┐
                                    ┌──────▼──────┐
                                    │ PostgreSQL  │  unpublished; volume-backed
                                    │     16      │
                                    └─────────────┘
 ```
+
+Container logs, error tracking (GlitchTip — see §17.5), and uptime monitoring are
+shared Pi-wide infra owned by a separate `ohiliazov-pi` deployment, not this stack.
 
 - **Same origin for the frontend and `/api`.** The tunnel routes `^/api/` to the API and everything else to Next, on one hostname. This is what allows `SameSite=Lax` cookies and no CORS ([§13.3](#133-csrf)) — and it is why the tunnel's ingress order matters: the frontend rule is a catch-all and must stay last.
 - **Nothing is published to the network.** Every container port binds `127.0.0.1`. Postgres and the docker-socket proxy are not published at all. The Pi has no inbound firewall rule to get wrong.
@@ -2100,14 +2103,14 @@ Enforced boundaries (by import-linter or an equivalent CI check, because these a
 - **Environments:** `local` (docker compose, built from source, hot reload), `production` (Pi, prebuilt images). There is no preview environment on this hardware — the `preview` env value and its `Disallow: /` behaviour remain in the config register for when one exists ([§14.8](#148-robotstxt)).
 - **`NEXT_PUBLIC_*` is inlined at image build time**, not read from the environment at runtime. `NEXT_PUBLIC_ENV=production` is what makes `robots.txt` allow crawling, so an image built without it ships a site-wide `noindex`. The build args live in `make push`; treat them as part of the release, not as configuration.
 
-**The Pi is shared.** It already runs other projects, so the deployment owns *namespaced* host artefacts and nothing else: `/etc/cloudflared/pickone.yml` (never the shared `config.yml`), a dedicated `cloudflared-pickone.service` (never `cloudflared service install`, which repoints the shared unit), `~/actions-runner-pickone/` with the label `pickone-prod` (never `~/actions-runner/` or `pi-prod`, which would carry another repo's `DEPLOY_DIR` and let either workflow deploy the wrong project), ports 8100/3100/8180, and an image cleanup scoped to `ohiliazov/pickone-*` rather than a host-wide prune. `scripts/pi/00-preflight.sh` verifies all of this **before** writing anything, and **fails closed** — an artefact it cannot positively identify as its own is a reason to stop, not permission to continue. `scripts/pi/test-preflight.sh` exercises those guards in a sandbox on any machine, so the claim is tested rather than asserted.
+**The Pi is shared.** It already runs other projects, so the deployment owns *namespaced* host artefacts and nothing else: `/etc/cloudflared/pickone.yml` (never the shared `config.yml`), a dedicated `cloudflared-pickone.service` (never `cloudflared service install`, which repoints the shared unit), `~/actions-runner-pickone/` with the label `pickone-prod` (never `~/actions-runner/` or `pi-prod`, which would carry another repo's `DEPLOY_DIR` and let either workflow deploy the wrong project), ports 8100/3100, and an image cleanup scoped to `ohiliazov/pickone-*` rather than a host-wide prune. `scripts/pi/00-preflight.sh` verifies all of this **before** writing anything, and **fails closed** — an artefact it cannot positively identify as its own is a reason to stop, not permission to continue. `scripts/pi/test-preflight.sh` exercises those guards in a sandbox on any machine, so the claim is tested rather than asserted.
 
 **What the Pi costs, stated plainly.** One board is a single point of failure with no managed failover, no PITR, and modest IO. That is an acceptable trade for a product whose traffic is unknown and whose write path is a handful of short transactions — but it makes the backup rehearsal and the log rotation above load-bearing rather than best-practice. Scaling out means moving Postgres first, not the API.
 
 ### 17.5 Observability
 
 - **Structured logs** (`structlog`, JSON) with a `request_id` propagated from the edge through Next.js into FastAPI and into every log line. Every battle transaction logs `battle_id`, `user_id`, `comparison_id`, outcome, and duration at INFO.
-- **Sentry** on both backend and frontend, with `rating_system_version` and `request_id` as tags.
+- **GlitchTip** (self-hosted, Sentry-protocol-compatible, shared `ohiliazov-pi` instance) on the backend via `sentry-sdk`, tagged with `rating_system_version` and `request_id`.
 - **Metrics** (`/metrics`, Prometheus format) — the ones that actually get alerted on:
   - `battles_created_total`, `battles_completed_total{status}`, `battle_pick_duration_seconds`
   - `battle_transaction_retries_total`, **`battle_deadlocks_total`** (alert on **any**)

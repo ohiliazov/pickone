@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import sentry_sdk
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -101,6 +102,7 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def _unhandled(_: Request, exc: Exception) -> JSONResponse:
+        sentry_sdk.capture_exception(exc)
         logger.exception("unhandled_exception", error=str(exc))
         err = PickOneError()
         return JSONResponse(status_code=err.status_code, content=err.envelope())

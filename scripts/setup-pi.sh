@@ -9,7 +9,7 @@
 #   cloudflared-pickone.service           not cloudflared.service
 #   ~/actions-runner-pickone/             not ~/actions-runner/
 #   runner label: pickone-prod            not pi-prod
-#   host ports 8100 / 3100 / 8180         not 8000 / 3000 / 8080
+#   host ports 8100 / 3100                not 8000 / 3000
 #
 # Step 0 verifies all of that before anything is written, and aborts rather
 # than overwrite a file it does not recognise as its own.
@@ -51,9 +51,7 @@ Next steps:
        curl -s -o /dev/null -w '%{http_code}\n' localhost:3100/
        systemctl is-active $CF_SERVICE
 
-  4. Add a Cloudflare Access policy on /logs before going live.
-
-  5. From your dev machine: bump VERSION, commit, push to main, then
+  4. From your dev machine: bump VERSION, commit, push to main, then
        make push
      The $RUNNER_LABEL runner picks up the tag and deploys automatically.
 

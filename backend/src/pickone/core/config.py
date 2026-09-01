@@ -106,6 +106,8 @@ class Settings(BaseSettings):
 
     auto_hide_report_count: int = Field(default=5, ge=1)
 
+    glitchtip_dsn: str = ""
+
     @model_validator(mode="after")
     def _resend_requires_a_key_in_production(self) -> Settings:
         if self.env.is_production and self.email_provider == "resend" and not self.resend_api_key:

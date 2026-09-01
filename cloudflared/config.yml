@@ -12,12 +12,6 @@ ingress:
     path: ^/api/
     service: http://localhost:8100
 
-  # Container logs. Must stay above the frontend catch-all, and MUST be covered
-  # by a Cloudflare Access policy — Dozzle has no authentication of its own.
-  - hostname: yourdomain.com
-    path: ^/logs(/|$)
-    service: http://localhost:8180
-
   # Everything else is the Next.js app: /, /rankings, /item/*, /compare/*,
   # /play, /robots.txt, /sitemap.xml and the OG image routes.
   - hostname: yourdomain.com
